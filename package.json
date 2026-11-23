@@ -1,0 +1,10 @@
+{
+  "name": "peacho-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend for Peacho - holds API keys server-side, checks sign-in, and handles Stripe subscriptions.",
+  "dependencies": {
+    "stripe": "^16.0.0"
+  }
+}
