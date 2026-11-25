@@ -166,9 +166,9 @@ let state = {
 };
 
 const TIERS = [
-  {id:'starter', name:'Starter', price:15, features:['Unlimited chat with memory','30 image generations / mo','Everyday coding help','Remembers your projects']},
-  {id:'pro', name:'Pro', price:29, features:['Everything in Starter','Unlimited image generation','20 short animations / mo','Priority response speed']},
-  {id:'ultra', name:'Ultra', price:49, features:['Everything in Pro','Unlimited animations','Advanced multi-file coding projects','Early access to new features']}
+  {id:'starter', name:'Starter', price:15, features:['Image and animation generation','150 messages a day','Chats saved to your account','Code help for games and websites']},
+  {id:'pro', name:'Pro', price:29, features:['Everything in Starter','400 messages a day']},
+  {id:'ultra', name:'Ultra', price:49, features:['Everything in Pro','1,000 messages a day']}
 ];
 
 function render(){
@@ -576,7 +576,7 @@ function renderMembershipModal(){
     <div class="modal">
       <button class="modal-close" id="modalClose">✕</button>
       <h2 style="color:var(--coral-dark);margin-bottom:2px;">Upgrade Peacho</h2>
-      <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">Unlock image and animation generation, and support unlimited chat memory.</p>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">Unlock image and animation generation and a higher daily message limit. Each image or animation counts as one message.</p>
       <div class="tier-grid">
         ${TIERS.map(t=>`
           <div class="tier-card ${t.id===state.selectedTier?'featured':''}" data-tier="${t.id}">
