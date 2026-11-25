@@ -3,7 +3,7 @@
 // This route adds your Anthropic key (kept on the server), enforces a daily message
 // limit so costs stay predictable, and keeps image and animation for paid members.
 
-import { getUser, getProfile, bumpUsage } from './_auth.js';
+import { checkUser, authFailureMessage, getProfile, bumpUsage, env } from './_auth.js';
 
 const MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS_CAP = 2000;
@@ -31,14 +31,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: { message: 'Method not allowed' } });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = env('ANTHROPIC_API_KEY');
   if (!apiKey) {
     return res.status(500).json({ error: { message: 'Server is missing ANTHROPIC_API_KEY. Add it in your hosting provider\'s environment variables.' } });
   }
 
-  const user = await getUser(req);
+  const { user, reason } = await checkUser(req);
   if (!user) {
-    return res.status(401).json({ error: { message: 'Your session expired. Reload the page.' } });
+    return res.status(reason === 'rejected' || reason === 'no_token' ? 401 : 500).json({ error: { message: authFailureMessage(reason) } });
   }
   const isGuest = user.is_anonymous === true;
 
@@ -72,7 +72,9 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('Peacho usage check error:', err);
-    return res.status(500).json({ error: { message: 'Couldn\'t check your usage. Try again in a moment.' } });
+    // Includes the reason so setup problems are easy to spot. It never contains your keys.
+    const reason = String((err && err.message) || err).slice(0, 240);
+    return res.status(500).json({ error: { message: `Couldn't check your usage. Reason: ${reason}` } });
   }
 
   try {

@@ -6,30 +6,61 @@
 //   SUPABASE_PUBLISHABLE_KEY  the sb_publishable_... key (safe to share)
 //   SUPABASE_SECRET_KEY       the sb_secret_... key (PRIVATE, server only)
 
-const SUPABASE_URL = () => (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+// Reads a setting and cleans up common copy-and-paste mistakes (spaces, line breaks, quote marks).
+export const env = (name) => String(process.env[name] || '').trim().replace(/^["']|["']$/g, '').trim();
 
-// Checks the signed-in user's token with Supabase. Returns the user, or null if it isn't valid.
-export async function getUser(req) {
+const SUPABASE_URL = () => env('SUPABASE_URL').replace(/\/$/, '');
+
+// Checks the signed-in user's token with Supabase.
+// Returns { user } on success, or { user: null, reason, detail } so the caller can say what went wrong.
+export async function checkUser(req) {
+  if (!SUPABASE_URL() || !env('SUPABASE_PUBLISHABLE_KEY')) {
+    return { user: null, reason: 'missing_settings' };
+  }
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token || !SUPABASE_URL() || !process.env.SUPABASE_PUBLISHABLE_KEY) return null;
+  if (!token) return { user: null, reason: 'no_token' };
   try {
     const r = await fetch(`${SUPABASE_URL()}/auth/v1/user`, {
-      headers: { apikey: process.env.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` }
+      headers: { apikey: env('SUPABASE_PUBLISHABLE_KEY'), Authorization: `Bearer ${token}` }
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      const detail = await r.text();
+      console.error('Peacho auth check failed:', r.status, detail);
+      return { user: null, reason: /api key/i.test(detail) ? 'bad_key' : 'rejected', detail };
+    }
     const user = await r.json();
-    return user && user.id ? user : null;
+    return user && user.id ? { user } : { user: null, reason: 'rejected' };
   } catch (err) {
     console.error('Peacho getUser error:', err);
-    return null;
+    return { user: null, reason: 'unreachable' };
+  }
+}
+
+export async function getUser(req) {
+  return (await checkUser(req)).user;
+}
+
+// A plain-language message for each reason checkUser can fail.
+export function authFailureMessage(reason) {
+  switch (reason) {
+    case 'missing_settings':
+      return 'This site is missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY. Add them in Vercel under Environment Variables, then redeploy.';
+    case 'bad_key':
+      return 'Supabase rejected SUPABASE_PUBLISHABLE_KEY. Copy it again from Supabase (Settings, API Keys) and update it in Vercel, then redeploy.';
+    case 'unreachable':
+      return 'This site couldn\'t reach Supabase. Check that SUPABASE_URL is right, with no slash at the end.';
+    case 'no_token':
+      return 'No session found. Reload the page.';
+    default:
+      return 'Your session expired. Reload the page.';
   }
 }
 
 // Calls Supabase's database API with the secret key (bypasses row-level security).
 // Only use this in server code, never in the page.
 export async function adminRest(path, { method = 'GET', body, prefer } = {}) {
-  const key = process.env.SUPABASE_SECRET_KEY;
+  const key = env('SUPABASE_SECRET_KEY');
   if (!key || !SUPABASE_URL()) throw new Error('Server is missing SUPABASE_URL or SUPABASE_SECRET_KEY.');
   const r = await fetch(`${SUPABASE_URL()}/rest/v1/${path}`, {
     method,
